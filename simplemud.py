@@ -23,26 +23,12 @@ author: Mark Frimston - mfrimston@gmail.com
 
 import time
 import re
+from rooms import rooms
+import items
 
 # import the MUD server class
 from mudserver import MudServer
 
-
-# structure defining the rooms in the game. Try adding more rooms to the game!
-rooms = {
-    "Tavern": {
-        "description": "\nYou're in a cozy tavern warmed by an open fire. This seems like a nice place to relax and socialize\n",
-        "exits": {"outside": "Outside Tavern"},
-    },
-    "Outside Tavern": {
-        "description": "\nYou're standing outside a tavern. It's raining. To you left is a wooden out house.\n",
-        "exits": {"inside": "Tavern", "bathroom": "OutHouse"},
-    },
-    "OutHouse": {
-        "description": "\nAs you open the door flys swarm disperse out. You step inside anyway...\n",
-        "exits": {"outside": "Outside Tavern"},
-    }
-}
 
 # stores the players in the game
 players = {}
@@ -52,7 +38,6 @@ mud = MudServer()
 
 # main game loop. We loop forever (i.e. until the program is terminated)
 while True:
-
     # pause for 1/5 of a second on each loop, so that we don't constantly
     # use 100% CPU time
     time.sleep(0.2)
@@ -73,11 +58,15 @@ while True:
             "name": None,
             "room": None,
             "level": 1,
-            "hp": 100,
-            "inventory": ["Notebook"]
+            "hp": 50,
+            "inventory": [items.PlainBread()],
+            "gold": 5
         }
 
         # send the new player a prompt for their name
+        mud.send_message(id, "|-----------------|")
+        mud.send_message(id, "| Zomb1e Survival |")
+        mud.send_message(id, "|-----------------|\n")
         mud.send_message(id, "What is your name?")
     # go through any recently disconnected players
     for id in mud.get_disconnected_players():
@@ -185,9 +174,38 @@ while True:
 
         # "inventory" command
         elif command in ["inventory", "i", "I"]:
+            mud.send_message(id, "Your inventory: ")
             for item in players[id]["inventory"]:
-                mud.send_message(id, "Your inventory: {}".format(str(players[id]["inventory"])))
+                mud.send_message(id, "{}".format(item))
                 # print('* ' + str(players[id]["inventory"]))
+
+        elif command in ["h", "H", "heal"]:
+            consumables = [item for item in players[id]["inventory"] if isinstance(item, items.Consumable)]
+            if not consumables:
+                mud.send_message(id, "You do not have any healing items!")
+                break
+
+            for i, item in enumerate(consumables, 1):
+                mud.send_message(id, "Choose an item to use to heal: ")
+                mud.send_message(id, "{}. {}".format(i, item))
+
+            valid = False
+            while not valid:
+                choice = mud.get_commands()
+                try:
+                    # to_eat = consumables[int(choice)]
+                    # for item in consumables:
+                    # to_eat = [item for item in consumables]
+                    if not choice:
+                        continue
+                    else:
+                        players[id]["hp"] = min(100, players[id]["hp"] + item.healing_value)
+                        players[id]["inventory"].remove(item)
+                        mud.send_message(id, "Current Hp: {}".format(players[id]["hp"]))
+                        valid = True
+                except (ValueError, IndexError):
+                    mud.send_message(id, "Invalid choice, try again.")
+
 
         # 'go' command
         elif command == "go":
